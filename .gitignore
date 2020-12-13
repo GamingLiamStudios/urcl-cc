@@ -1,0 +1,19 @@
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Build
+[Bb]uild/
+[Oo]ut/
+cmake-build-debug/
+cmake-build-release/
+
+# CMake
+CMakeSettings.json
+
+# Dependencies
+extern/bin/release/*.lib
+extern/bin/debug/*.lib
+extern/bin/release/*.a
+extern/bin/debug/*.a
