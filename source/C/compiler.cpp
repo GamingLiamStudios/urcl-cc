@@ -73,6 +73,8 @@ int C::compile(std::string_view input_file_name, std::string_view output_file_na
             index = nindex + 1;
         }
 
+        std::cout << line << "\n";
+
         for (int i = 0; i < words.size(); i++)
         {
             if (datatypes.find(words[i]) != datatypes.end())
@@ -114,13 +116,20 @@ int C::compile(std::string_view input_file_name, std::string_view output_file_na
                         // Clean up strings
                         if ((index = var_name.find(',')) != std::string::npos)
                             var_name = var_name.substr(0, index);
-                        if ((index = var_name.find(')')) != std::string::npos)
-                            var_name = var_name.substr(0, index);
+                        if (var_name.back() == ')')
+                            var_name = var_name.substr(0, var_name.size() - 1);
 
-                        if ((index = var_name.find(',')) != std::string::npos)
-                            var_name = var_name.substr(index + 1);
+                        if ((index = var_type.find(',')) != std::string::npos)
+                            var_type = var_type.substr(index + 1);
                         if ((index = var_type.find('(')) != std::string::npos)
                             var_type = var_type.substr(index + 1);
+
+                        if (datatypes.find(var_type) == datatypes.end())
+                        {
+                            std::cerr << "Unknown datatype " << var_type << "\n";
+                            input_file.close();
+                            return -1;
+                        }
 
                         int mem_offset;
 
@@ -145,6 +154,8 @@ int C::compile(std::string_view input_file_name, std::string_view output_file_na
                                   datatypes.at(scopes.at(scopes.size() - 2).back().second.second);
                         }
 
+                        std::cout << var_type << "\n";
+
                         min_ram = std::max(min_ram, mem_offset + datatypes.at(var_type));
 
                         scopes.back().insert(
@@ -153,8 +164,72 @@ int C::compile(std::string_view input_file_name, std::string_view output_file_na
                 }
                 else    // Variable Decloration
                 {
+                    auto var_type = std::string(words[i]);
+                    auto var_name = std::string(words[++i]);
+
+                    if (var_type == "void")
+                    {
+                        std::cerr << "Void Variable " << var_name << "\n";
+                        input_file.close();
+                        return -1;
+                    }
+
+                    int mem_offset, blen;
+
+                    blen = datatypes.at(var_type);
+
+                    if (!scopes.back().empty())
+                    {
+                        if (scopes.back().find(var_name) != scopes.back().end())
+                        {
+                            std::cerr << "Variable redefinition(" << var_name
+                                      << ") in same scope\n";
+                            input_file.close();
+                            return -1;
+                        }
+                        mem_offset = scopes.back().back().second.first +
+                          datatypes.at(scopes.back().back().second.second);
+                    }
+                    else
+                    {
+                        if (scopes.at(scopes.size() - 2).empty())
+                            mem_offset = 0;
+                        else
+                            mem_offset = scopes.at(scopes.size() - 2).back().second.first +
+                              datatypes.at(scopes.at(scopes.size() - 2).back().second.second);
+                    }
+
+                    min_ram = std::max(min_ram, mem_offset + blen);
+
+                    scopes.back().insert({ var_name, { mem_offset, var_type } });
+
                     // Initalize Variable
-                    if (words.size() - i > 2 && words[i + 2][0] == '=') { }
+                    if (words.size() - i > 2 && words[++i][0] == '=')
+                    {
+                        if (std::isdigit(words[++i][0]))
+                        {
+                            unsigned int init_val;
+                            if (std::strncmp(words[i].substr(0, 2).data(), "0x", 2) == 0)
+                                init_val = std::stoul(words[i].data(), nullptr, 16);
+                            else if (std::strncmp(words[i].substr(0, 2).data(), "0b", 2) == 0)
+                                init_val = std::stoul(words[i].data(), nullptr, 2);
+                            else
+                                init_val = std::stoul(words[i].data(), nullptr, 10);
+
+                            compile_result << "// " << var_name << "\n";
+
+                            if (blen > 0)
+                                for (int j = 0; j < blen; j++)
+                                    compile_result << fmt::format(
+                                      "STORE {}, {}\n",
+                                      mem_offset + j,
+                                      (init_val << j * 8) & 0xff);
+                        }
+                        else
+                        {
+                            // TODO: Function Variable initalizing
+                        }
+                    }
                 }
             }
             if (words[i].find('}') != std::string_view::npos && func)
