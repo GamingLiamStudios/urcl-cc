@@ -223,7 +223,7 @@ int C::compile(std::string_view input_file_name, std::string_view output_file_na
                                     compile_result << fmt::format(
                                       "STORE {}, {}\n",
                                       mem_offset + j,
-                                      (init_val << j * 8) & 0xff);
+                                      (init_val >> j * 8) & 0xff);
                         }
                         else
                         {
