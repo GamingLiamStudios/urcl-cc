@@ -1,55 +1,42 @@
-// STL
 #include <iostream>
-#include <string_view>
-#include <cstring>
+#include <fstream>
 
-// Compilers
-#include "C/compiler.h"
+#include <fmt/format.h>
 
-int main(int argc, char *argv[])
+#include "token.h"
+#include "compiler.h"
+#include "util/error.h"
+
+int main()
 {
-    if (argc <= 1)
-    {
-        std::cerr << "ERROR: No Compile Options Specified!\n";
-        return -1;
-    }
+    std::string   text;
+    std::ifstream file;
+    file.open("test.c", std::ios::in | std::ios::ate);
+    text.resize(file.tellg());
+    file.seekg(0, std::ios::beg);
+    file.read(&text[0], text.size());
+    file.close();
 
-    std::string_view output_file_name = "output.urcl";
-    std::string_view input_format     = "C";
-    std::string_view input_file_name;
-
-    // Read options
-    // TODO: multi-word strings
-    for (int i = 1; i < argc; i++)
+    try
     {
-        auto str = std::string_view(argv[i], std::strlen(argv[i]));
-        if (str.at(0) == '-')
+        auto tokens = tokenize(text);
+        // auto compiler = Compiler(tokens);
+
+        for (auto &token : tokens)
         {
-            // Option
-            auto opt = std::string_view(str.begin() + 1, str.length() - 1);
-            if (std::strcmp(opt.data(), "o") == 0) { output_file_name = argv[++i]; }
-            if (std::strcmp(opt.data(), "lang") == 0) { input_format = argv[++i]; }
+            switch (token.type)
+            {
+            case Token::Types::Keyword: std::cout << "Keyword: " << token.val << "\n"; break;
+            case Token::Types::Identifier: std::cout << "Identifier: " << token.val << "\n"; break;
+            case Token::Types::Constant: std::cout << "Constant: " << token.val << "\n"; break;
+            case Token::Types::Operator: std::cout << "Operator: " << token.val << "\n"; break;
+            case Token::Types::Separator: std::cout << "Separator: " << token.val << "\n"; break;
+            }
         }
-        else
-            input_file_name = str;
     }
-
-    // Input file check
-    if (input_file_name.empty())
+    catch (TokenizationError &e)
     {
-        std::cerr << "ERROR: No Input File Specified!\n";
+        std::cerr << fmt::format("Error at line: {}\n\twhat: {}\n", e.line(), e.what());
         return -1;
     }
-
-    int result;
-
-    if (std::strcmp(input_format.data(), "C") == 0)
-        result = C::compile(input_file_name, output_file_name);
-    else
-    {
-        std::cerr << "ERROR: Unknown Input Language!\n";
-        return -1;
-    }
-
-    return result;
 }
